@@ -1,11 +1,317 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using Un4seen.Bass;
 
 namespace SimpleRandAudio {
-    class Program {
-        static void Main(string[] args) {
+    internal class Program {
+        private static readonly string[] exts = { ".mp3", ".flac", ".oog", ".wav" };
+
+        private static bool Check(string file) {
+            if (file is null) return false;
+            if (file.Length <= 0) return false;
+            file = file.ToLower();
+            foreach (string ext in exts)
+                if (file.EndsWith(ext)) return true;
+            return false;
+        }
+
+        private static string sec2str(double sec) {
+            if (sec < 3600) {
+                int mi = (int)(sec / 60);
+                sec -= mi * 60;
+                string mi_str = mi < 10 ? $"0{mi.ToString()}" : mi.ToString();
+                string sec_str = sec < 10 ? $"0{sec.ToString("F1")}" : sec.ToString("F1");
+                return $"{mi_str}:{sec_str}";
+            } else {
+                int hr = (int)(sec / 3600);
+                sec -= hr * 3600;
+                return $"{hr.ToString()}:{sec2str(sec)}";
+            }
+        }
+
+        private static void Main(string[] args) {
+            if (!Bass.BASS_Init(-1, 96000, BASSInit.BASS_DEVICE_DEFAULT, IntPtr.Zero)) {
+                Console.Write($"Init failed:{Bass.BASS_ErrorGetCode().ToString()} ...");
+                Console.ReadKey(true);
+                return;
+            }
+            string GetFullPath(string path) {
+                try {
+                    return Path.GetFullPath(path);
+                } catch {
+                    return null;
+                }
+            }
+            //Bass.BASS_SetVolume(0.5f);
+            Console.SetBufferSize(256, 9999);
+            string cmd;
+            List<string> files = null;
+            var datas = new HashSet<string>();
+            string listfile = null;
+            for (; ; ) {
+                Console.Write("输入文件夹/列表文件>"); cmd = Console.ReadLine().Replace("\"", string.Empty);
+                if (!(Directory.Exists(cmd) || File.Exists(cmd))) {
+                    Console.WriteLine($"路径 {cmd} 不存在/不合法");
+                    continue;
+                }
+                cmd = GetFullPath(cmd);
+                if (File.Exists(cmd)) {
+                    foreach (string _file in File.ReadAllLines(cmd, Encoding.UTF8)) {
+                        if (_file is null) continue;
+                        if (_file.Length <= 0) continue;
+                        string file = _file;
+                        if (int.TryParse(file, out int number)) {
+                            Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, Math.Min(10000, Math.Max(0, number)));
+                        } else if (Check(file = GetFullPath(file.Replace("\"", string.Empty))) && datas.Add(file))
+                            Console.WriteLine(file);
+                    }
+                    listfile = cmd;
+                } else {
+                    var last_time = DateTime.Now.AddSeconds(-1);
+                    void f(string path) {
+                        var t = DateTime.Now;
+                        if (t.Subtract(last_time).TotalMilliseconds > 33) {
+                            last_time = t;
+                            Console.Title = $"...{path}";
+                        }
+                        try {
+                            foreach (string file in Directory.GetFiles(path))
+                                if (Check(file))
+                                    if (datas.Add(file))
+                                        Console.WriteLine(file);
+                        } catch (Exception e) {
+                            Console.WriteLine(e);
+                        }
+                        try {
+                            foreach (string dir in Directory.GetDirectories(path))
+                                f(dir);
+                        } catch (Exception e) {
+                            Console.WriteLine(e);
+                        }
+                    }
+                    f(cmd);
+                }
+                Console.WriteLine($"一共{datas.Count}个文件");
+                files = new List<string>(datas);
+                break;
+            }
+            int nfile = files.Count;
+            cmd = null;
+            var ch = new Mutex();
+            (new Thread(() => {
+                for (; ; ) {
+                    if (cmd is null) {
+                        ch.WaitOne();
+                        Console.Write('>'); cmd = Console.ReadLine();
+                        ch.ReleaseMutex();
+                        if (cmd is "exit" || cmd is "quit")
+                            break;
+                    }
+                    Thread.Sleep(1000);
+                }
+            })).Start();
+            var rand = new Random();
+            bool started = false;
+            bool notquit = true;
+            var re_vol = new Regex(@"^vol\s+(?<number>\d+)\s?$", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+            void save() {
+                File.WriteAllLines(listfile, files, Encoding.UTF8);
+                File.AppendAllText(listfile, $"\n{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM).ToString()}\n");
+            }
+            double last_pos;
+            Predicate<string> toplay = null;
+            bool pcmd() {
+                if (cmd is null) return true;
+                ch.WaitOne();
+                switch (cmd) {
+                    case "exit":
+                    case "quit": {
+                        return notquit = false;
+                    }
+                    case "start": started = true; break;
+                    case "help":
+                    case "?":
+                        Console.WriteLine(@"
+命令列表:
+    help/?          显示当前信息
+    start           开始播放列表
+    next            下一首
+    exit/quit       退出
+    save <path>     保存当前播放列表到文件<path>，包括音量
+    vol [<value>]   设置/显示当前音量，值范围 [0, 10000] 整数，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
+    ?<pattern>      使用 pattern 筛选显示歌曲路径，pattern 以 \ 开头则为正则表达式(除了开头的\外)，否则为子串查找
+    =<pattern>      播放符合 pattern 的第一首歌曲，pattern 格式同 ?<pattern>
+    -<pattern>      从列表里删除所有符合 pattern 的歌曲，pattern 格式同 ?<pattern>，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
+    add <path>      增加 path 文件夹下/文件的歌曲，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
+");
+                        break;
+                    case "next": {
+                        cmd = null;
+                        ch.ReleaseMutex();
+                        return false;
+                    }
+                    case "=":
+                    case "-":
+                        Console.WriteLine("命令缺少 pattern");
+                        break;
+                    default:
+                        if (cmd.StartsWith("save")) {
+                            if (cmd.Length > 5)
+                                listfile = GetFullPath(cmd.Substring(5).Replace("\"", string.Empty));
+                            if (listfile is null || listfile is "") {
+                                Console.WriteLine("没有导出路径，请使用 save <file path> 命令指定导出路径");
+                            } else {
+                                save();
+                            }
+                        } else if (cmd.StartsWith("vol")) {
+                            var m = re_vol.Match(cmd);
+                            if (m.Success) {
+                                if (Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, Math.Min(10000, Math.Max(0, int.Parse(m.Groups["number"].Value))))) {
+                                    Console.WriteLine("音量设置成功");
+                                    if (!(listfile is null) && File.Exists(listfile))
+                                        save();
+                                } else {
+                                    Console.WriteLine($"设置失败:{Bass.BASS_ErrorGetCode().ToString()}");
+                                }
+                            } else {
+                                Console.WriteLine($"当前音量:{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM)}");
+                            }
+                        } else if (cmd.StartsWith("add")) {
+                            string path = GetFullPath(cmd.Substring(4).Replace("\"", string.Empty));
+                            if (File.Exists(path)) {
+                                if (Check(path))
+                                    if (datas.Add(path)) {
+                                        files.Add(path);
+                                        nfile = files.Count;
+                                        Console.WriteLine("添加成功");
+                                    } else
+                                        Console.WriteLine("文件已存在");
+                                else
+                                    Console.WriteLine("不支持的后缀");
+                                if (!(listfile is null) && File.Exists(listfile))
+                                    save();
+                            } else if (Directory.Exists(path)) {
+                                var last_time = DateTime.Now.AddSeconds(-1);
+                                void f(string p) {
+                                    var t = DateTime.Now;
+                                    if (t.Subtract(last_time).TotalMilliseconds > 33) {
+                                        last_time = t;
+                                        Console.Title = $"...{p}";
+                                    }
+                                    foreach (string file in Directory.GetFiles(p))
+                                        if (Check(file))
+                                            if (datas.Add(file)) {
+                                                files.Add(file);
+                                                Console.WriteLine($"+{file}");
+                                            }
+                                    foreach (string dir in Directory.GetDirectories(p))
+                                        f(dir);
+                                }
+                                f(path);
+                                Console.WriteLine($"成功添加{files.Count - nfile}个文件");
+                                nfile = files.Count;
+                                if (!(listfile is null) && File.Exists(listfile))
+                                    save();
+                            } else
+                                Console.WriteLine("路径非法");
+                        } else if (cmd.StartsWith("?")) {
+                            string pattern = cmd.Substring(1);
+                            try {
+                                var f = pattern.StartsWith("\\") ?
+                                    (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
+                                    (Func<string, bool>)(p => p.Contains(pattern));
+                                int n = 0;
+                                foreach (string file in files)
+                                    if (f(file)) {
+                                        ++n;
+                                        Console.WriteLine(file);
+                                    }
+                                Console.WriteLine($"共{n}个符合");
+                            } catch (Exception e) {
+                                Console.WriteLine(e);
+                            }
+                        } else if (cmd.StartsWith("-")) {
+                            string pattern = cmd.Substring(1);
+                            try {
+                                var f = pattern.StartsWith("\\") ?
+                                    (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
+                                    (Func<string, bool>)(p => p.Contains(pattern));
+                                int n = 0;
+                                foreach (string file in files)
+                                    if (f(file)) {
+                                        ++n;
+                                        Console.WriteLine($"-{file}");
+                                        datas.Remove(file);
+                                    }
+                                files.RemoveRange(0, files.Count);
+                                files.AddRange(datas);
+                                nfile = files.Count;
+                                Console.WriteLine($"共删除{n}个");
+                                if (!(listfile is null) && File.Exists(listfile))
+                                    save();
+                            } catch (Exception e) {
+                                Console.WriteLine(e);
+                            }
+                        } else if (cmd.StartsWith("=")) {
+                            string pattern = cmd.Substring(1);
+                            try {
+                                toplay = pattern.StartsWith("\\") ?
+                                    (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
+                                    (Predicate<string>)(p => p.Contains(pattern));
+                            } catch (Exception e) {
+                                Console.WriteLine(e);
+                            }
+                        }
+                        break;
+                }
+                cmd = null;
+                ch.ReleaseMutex();
+                return true;
+            }
+            while (notquit && pcmd()) {
+                if (!started) {
+                    Thread.Sleep(333);
+                    continue;
+                }
+                if (nfile <= 0) {
+                    Console.Title = "文件列表是空的！！！";
+                    Thread.Sleep(333);
+                    continue;
+                }
+                int index = toplay is null ? rand.Next(nfile) : files.FindIndex(toplay);
+                toplay = null;
+                if (index < 0) continue;
+                string file = files[index];
+                int h = Bass.BASS_StreamCreateFile(file, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+                if (h is 0) {
+                    if (ch.WaitOne(1)) {
+                        Console.WriteLine($"读取文件失败:{Bass.BASS_ErrorGetCode()}|{file}");
+                        ch.ReleaseMutex();
+                    } else
+                        Console.Title = $"读取文件失败:{Bass.BASS_ErrorGetCode()}|{file}";
+                    continue;
+                }
+                string total_time = sec2str(Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h)));
+                last_pos = -1;
+                Bass.BASS_ChannelPlay(h, true);
+                while (pcmd()) {
+                    double this_pos = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetPosition(h));
+                    if (this_pos <= last_pos) break;
+                    last_pos = this_pos;
+                    Console.Title = $"{sec2str(this_pos)}/{total_time} | {file}";
+                    Thread.Sleep(333);
+                }
+                Bass.BASS_ChannelStop(h);
+                Bass.BASS_StreamFree(h);
+            }
+            Bass.BASS_Stop();
+            Bass.BASS_Free();
         }
     }
 }
