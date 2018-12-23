@@ -48,14 +48,22 @@ namespace SimpleRandAudio {
                     return null;
                 }
             }
+            int narg = args.Length;
+            int iarg = 0;
             //Bass.BASS_SetVolume(0.5f);
+            Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, 2500);
             Console.SetBufferSize(256, 9999);
             string cmd;
             List<string> files = null;
             var datas = new HashSet<string>();
             string listfile = null;
             for (; ; ) {
-                Console.Write("输入文件夹/列表文件>"); cmd = Console.ReadLine().Replace("\"", string.Empty);
+                Console.Write("输入文件夹/列表文件>");
+                if (iarg < narg)
+                    Console.WriteLine(cmd = args[iarg++]);
+                else
+                    cmd = Console.ReadLine();
+                cmd = cmd.Replace("\"", string.Empty);
                 if (!(Directory.Exists(cmd) || File.Exists(cmd))) {
                     Console.WriteLine($"路径 {cmd} 不存在/不合法");
                     continue;
@@ -123,6 +131,7 @@ namespace SimpleRandAudio {
             void save() {
                 File.WriteAllLines(listfile, files, Encoding.UTF8);
                 File.AppendAllText(listfile, $"\n{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM).ToString()}\n");
+                Console.WriteLine($"已保存到{listfile}");
             }
             double last_pos;
             Predicate<string> toplay = null;
@@ -297,14 +306,16 @@ namespace SimpleRandAudio {
                         Console.Title = $"读取文件失败:{Bass.BASS_ErrorGetCode()}|{file}";
                     continue;
                 }
-                string total_time = sec2str(Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h)));
+                var total_time = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h));
+                string str_total_time = sec2str(total_time);
+                total_time *= 0.95;
                 last_pos = -1;
                 Bass.BASS_ChannelPlay(h, true);
-                while (pcmd()) {
+                while (pcmd() && toplay is null) {
                     double this_pos = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetPosition(h));
-                    if (this_pos <= last_pos) break;
+                    if (this_pos <= last_pos && this_pos > total_time) break;
                     last_pos = this_pos;
-                    Console.Title = $"{sec2str(this_pos)}/{total_time} | {file}";
+                    Console.Title = $"{sec2str(this_pos)}/{str_total_time} | {file}";
                     Thread.Sleep(333);
                 }
                 Bass.BASS_ChannelStop(h);
