@@ -52,7 +52,9 @@ namespace SimpleRandAudio {
             int iarg = 0;
             //Bass.BASS_SetVolume(0.5f);
             Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, 2500);
-            //Console.SetBufferSize(256, 9999);
+            var osv = Environment.OSVersion;
+            if (osv.Platform != PlatformID.Win32NT || osv.Version.Major < 10)
+                Console.SetBufferSize(256, 9999);
             string cmd;
             List<string> files = null;
             var datas = new HashSet<string>();
