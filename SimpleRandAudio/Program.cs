@@ -36,6 +36,8 @@ namespace SimpleRandAudio {
         }
 
         private static void Main(string[] args) {
+            //Console.OutputEncoding = Encoding.UTF8;
+            //Console.InputEncoding = Encoding.UTF8;
             if (!Bass.BASS_Init(-1, 96000, BASSInit.BASS_DEVICE_DEFAULT, IntPtr.Zero)) {
                 Console.Write($"Init failed:{Bass.BASS_ErrorGetCode().ToString()} ...");
                 Console.ReadKey(true);
@@ -126,14 +128,19 @@ namespace SimpleRandAudio {
                     Thread.Sleep(1000);
                 }
             })).Start();
-            var rand = new Random();
+            var rand = new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF));
             bool started = false;
             bool notquit = true;
             var re_vol = new Regex(@"^vol\s+(?<number>\d+)\s?$", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
             void save() {
-                File.WriteAllLines(listfile, files, Encoding.UTF8);
-                File.AppendAllText(listfile, $"\n{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM).ToString()}\n");
-                Console.WriteLine($"已保存到{listfile}");
+                try {
+                    File.WriteAllLines(listfile, files, Encoding.UTF8);
+                    File.AppendAllText(listfile, $"\n{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM).ToString()}\n");
+                    Console.WriteLine($"已保存到{listfile}");
+                } catch (Exception e) {
+                    Console.WriteLine($"保存到{listfile}失败");
+                    Console.WriteLine(e);
+                }
             }
             double last_pos;
             Predicate<string> toplay = null;
@@ -306,7 +313,7 @@ namespace SimpleRandAudio {
                     Thread.Sleep(333);
                     continue;
                 }
-                int index = toplay is null ? ((rand.Next(nfile) + (new Random().Next(nfile))) % nfile) : files.FindIndex(toplay);
+                int index = toplay is null ? ((1 + rand.Next(nfile) + (new Random().Next(nfile))) % nfile) : files.FindIndex(toplay);
                 toplay = null;
                 if (index < 0) {
                     if (ch.WaitOne(1)) {
