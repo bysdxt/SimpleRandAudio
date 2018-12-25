@@ -168,6 +168,8 @@ namespace SimpleRandAudio {
     =<pattern>      播放符合 pattern 的第一首歌曲，pattern 格式同 ?<pattern>
     -<pattern>      从列表里删除所有符合 pattern 的歌曲，pattern 格式同 ?<pattern>，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
     add <path>      增加 path 文件夹下/文件的歌曲，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
+    =               (不含 pattern) 还没开始播放时相当于 start 命令;开始播放后相当于 next 命令
+    -               (不含 pattern) 还没开始播放时没有效果;开始播放后相当于 stop 命令
 ");
                         break;
                     case "next": {
@@ -181,9 +183,24 @@ namespace SimpleRandAudio {
                         started = false;
                         return false;
                     }
-                    case "=":
+                    case "=": {
+                        if (started) {
+                            cmd = null;
+                            ch.ReleaseMutex();
+                            return false;
+                        } else {
+                            started = true; break;
+                        }
+                    }
                     case "-":
-                        Console.WriteLine("命令缺少 pattern");
+                        if (started) {
+                            cmd = null;
+                            ch.ReleaseMutex();
+                            started = false;
+                            return false;
+                        } else {
+                            Console.WriteLine("当前没有播放");
+                        }
                         break;
                     default:
                         if (cmd.StartsWith("save")) {
