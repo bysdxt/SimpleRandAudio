@@ -2,7 +2,7 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
   <assemblyIdentity
       name="SimpleRandAudio"
-      version="1.0.6.0"
+      version="1.0.7.0"
     />
   <description>SimpleRandAudio</description>
   <asmv3:application>

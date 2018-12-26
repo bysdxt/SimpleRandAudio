@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -38,6 +39,9 @@ namespace SimpleRandAudio {
         private static void Main(string[] args) {
             //Console.OutputEncoding = Encoding.UTF8;
             //Console.InputEncoding = Encoding.UTF8;
+            var mainmoddir = Path.GetDirectoryName(Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName));
+            if (Directory.Exists(mainmoddir))
+                Bass.BASS_PluginLoadDirectory(mainmoddir);
             if (!Bass.BASS_Init(-1, 96000, BASSInit.BASS_DEVICE_DEFAULT, IntPtr.Zero)) {
                 Console.Write($"Init failed:{Bass.BASS_ErrorGetCode().ToString()} ...");
                 Console.ReadKey(true);
@@ -125,7 +129,7 @@ namespace SimpleRandAudio {
                         if (cmd is "exit" || cmd is "quit")
                             break;
                     }
-                    Thread.Sleep(1000);
+                    Thread.Sleep(666);
                 }
             })).Start();
             var rand = new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF));
@@ -322,15 +326,15 @@ namespace SimpleRandAudio {
             while (notquit && pcmd()) {
                 if (!started) {
                     Console.Title = "等待 start 命令开始播放/使用 help 命令以获取帮助";
-                    Thread.Sleep(333);
+                    Thread.Sleep(320);
                     continue;
                 }
                 if (nfile <= 0) {
                     Console.Title = "文件列表是空的！！！";
-                    Thread.Sleep(333);
+                    Thread.Sleep(320);
                     continue;
                 }
-                int index = toplay is null ? ((1 + rand.Next(nfile) + (new Random().Next(nfile))) % nfile) : files.FindIndex(toplay);
+                int index = toplay is null ? ((1 + rand.Next(nfile) + (new Random(Environment.TickCount).Next(nfile))) % nfile) : files.FindIndex(toplay);
                 toplay = null;
                 if (index < 0) {
                     if (ch.WaitOne(1)) {
@@ -360,7 +364,7 @@ namespace SimpleRandAudio {
                     if ((this_pos <= last_pos && this_pos > total_time2) || (this_pos >= total_time)) break;
                     last_pos = this_pos;
                     Console.Title = $"{sec2str(this_pos)}/{str_total_time} | {file}";
-                    Thread.Sleep(333);
+                    Thread.Sleep(320);
                 }
                 Bass.BASS_ChannelStop(h);
                 Bass.BASS_StreamFree(h);
