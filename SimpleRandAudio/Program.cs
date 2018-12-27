@@ -39,6 +39,7 @@ namespace SimpleRandAudio {
         private static void Main(string[] args) {
             //Console.OutputEncoding = Encoding.UTF8;
             //Console.InputEncoding = Encoding.UTF8;
+            var rand = new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF));
             var mainmoddir = Path.GetDirectoryName(Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName));
             if (Directory.Exists(mainmoddir))
                 Bass.BASS_PluginLoadDirectory(mainmoddir);
@@ -132,7 +133,6 @@ namespace SimpleRandAudio {
                     Thread.Sleep(666);
                 }
             })).Start();
-            var rand = new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF));
             bool started = false;
             bool notquit = true;
             var re_vol = new Regex(@"^vol\s+(?<number>\d+)\s?$", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
@@ -146,6 +146,7 @@ namespace SimpleRandAudio {
                     Console.WriteLine(e);
                 }
             }
+            string playing = null;
             double last_pos;
             Predicate<string> toplay = null;
             bool pcmd() {
@@ -165,6 +166,7 @@ namespace SimpleRandAudio {
     start           开始播放列表
     stop            停止播放(不会记录播放位置)
     next            下一首
+    now/playing/`   输出当前正在播放的文件路径
     exit/quit       退出
     save <path>     保存当前播放列表到文件<path>，包括音量
     vol [<value>]   设置/显示当前音量，值范围 [0, 10000] 整数，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
@@ -181,6 +183,11 @@ namespace SimpleRandAudio {
                         ch.ReleaseMutex();
                         return false;
                     }
+                    case "now":
+                    case "`":
+                    case "playing":
+                        Console.WriteLine(playing ?? "<当前没有播放任何文件>");
+                        break;
                     case "stop": {
                         cmd = null;
                         ch.ReleaseMutex();
@@ -344,6 +351,7 @@ namespace SimpleRandAudio {
                     continue;
                 }
                 string file = files[index];
+                file = GetFullPath(file) ?? file;
                 int h = Bass.BASS_StreamCreateFile(file, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
                 if (h is 0) {
                     if (ch.WaitOne(1)) {
@@ -353,6 +361,7 @@ namespace SimpleRandAudio {
                         Console.Title = $"读取文件失败:{Bass.BASS_ErrorGetCode()}|{file}";
                     continue;
                 }
+                playing = file;
                 double total_time = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h));
                 string str_total_time = sec2str(total_time);
                 double total_time2 = total_time * 0.95;
@@ -366,6 +375,7 @@ namespace SimpleRandAudio {
                     Console.Title = $"{sec2str(this_pos)}/{str_total_time} | {file}";
                     Thread.Sleep(320);
                 }
+                playing = null;
                 Bass.BASS_ChannelStop(h);
                 Bass.BASS_StreamFree(h);
             }
