@@ -199,21 +199,14 @@ namespace SimpleRandAudio {
                     }
                     case "=": {
                         if (started) {
-                            cmd = null;
-                            ch.ReleaseMutex();
-                            return false;
+                            goto case "next";
                         } else {
-                            started = true; break;
+                            goto case "start";
                         }
                     }
                     case "-":
                         if (started) {
-                            cmd = null;
-                            ch.ReleaseMutex();
-                            started = false;
-                            if (!(playing is null))
-                                Console.WriteLine($"之前播放: {playing}");
-                            return false;
+                            goto case "stop";
                         } else {
                             Console.WriteLine("当前没有播放");
                         }
