@@ -158,6 +158,7 @@ namespace SimpleRandAudio {
                         return notquit = false;
                     }
                     case "start": started = true; break;
+                    case "":
                     case "help":
                     case "?":
                         Console.WriteLine(@"
@@ -192,6 +193,8 @@ namespace SimpleRandAudio {
                         cmd = null;
                         ch.ReleaseMutex();
                         started = false;
+                        if (!(playing is null))
+                            Console.WriteLine($"之前播放: {playing}");
                         return false;
                     }
                     case "=": {
@@ -208,6 +211,8 @@ namespace SimpleRandAudio {
                             cmd = null;
                             ch.ReleaseMutex();
                             started = false;
+                            if (!(playing is null))
+                                Console.WriteLine($"之前播放: {playing}");
                             return false;
                         } else {
                             Console.WriteLine("当前没有播放");
