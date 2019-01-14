@@ -17,29 +17,35 @@ namespace SimpleRandAudio {
             if (file is null) return false;
             if (file.Length <= 0) return false;
             file = file.ToLower();
-            foreach (string ext in exts)
+            foreach (var ext in exts)
                 if (file.EndsWith(ext)) return true;
             return false;
         }
 
-        private static string sec2str(double sec) {
+        private static string Sec2Str(double sec) {
             if (sec < 3600) {
-                int mi = (int)(sec / 60);
+                var mi = (int)(sec / 60);
                 sec -= mi * 60;
-                string mi_str = mi < 10 ? $"0{mi.ToString()}" : mi.ToString();
-                string sec_str = sec < 10 ? $"0{sec.ToString("F1")}" : sec.ToString("F1");
+                var mi_str = mi < 10 ? $"0{mi.ToString()}" : mi.ToString();
+                var sec_str = sec < 10 ? $"0{sec.ToString("F1")}" : sec.ToString("F1");
                 return $"{mi_str}:{sec_str}";
             } else {
-                int hr = (int)(sec / 3600);
+                var hr = (int)(sec / 3600);
                 sec -= hr * 3600;
-                return $"{hr.ToString()}:{sec2str(sec)}";
+                return $"{hr.ToString()}:{Sec2Str(sec)}";
             }
         }
 
+        private static Random RCutN(Random r, int n) {
+            while (--n >= 0)
+                r.NextDouble();
+            return r;
+        }
         private static void Main(string[] args) {
             //Console.OutputEncoding = Encoding.UTF8;
             //Console.InputEncoding = Encoding.UTF8;
-            var rand = new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF));
+            Thread.Sleep(1);
+            var rand = RCutN(new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF)), Environment.TickCount % 257);
             var mainmoddir = Path.GetDirectoryName(Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName));
             if (Directory.Exists(mainmoddir))
                 Bass.BASS_PluginLoadDirectory(mainmoddir);
@@ -55,8 +61,8 @@ namespace SimpleRandAudio {
                     return null;
                 }
             }
-            int narg = args.Length;
-            int iarg = 0;
+            var narg = args.Length;
+            var iarg = 0;
             //Bass.BASS_SetVolume(0.5f);
             Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, 2500);
             var osv = Environment.OSVersion;
@@ -79,11 +85,11 @@ namespace SimpleRandAudio {
                 }
                 cmd = GetFullPath(cmd);
                 if (File.Exists(cmd)) {
-                    foreach (string _file in File.ReadAllLines(cmd, Encoding.UTF8)) {
+                    foreach (var _file in File.ReadAllLines(cmd, Encoding.UTF8)) {
                         if (_file is null) continue;
                         if (_file.Length <= 0) continue;
-                        string file = _file;
-                        if (int.TryParse(file, out int number)) {
+                        var file = _file;
+                        if (int.TryParse(file, out var number)) {
                             Bass.BASS_SetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM, Math.Min(10000, Math.Max(0, number)));
                         } else if (Check(file = GetFullPath(file.Replace("\"", string.Empty))) && datas.Add(file))
                             Console.WriteLine(file);
@@ -98,7 +104,7 @@ namespace SimpleRandAudio {
                             Console.Title = $"...{path}";
                         }
                         try {
-                            foreach (string file in Directory.GetFiles(path))
+                            foreach (var file in Directory.GetFiles(path))
                                 if (Check(file))
                                     if (datas.Add(file))
                                         Console.WriteLine(file);
@@ -106,7 +112,7 @@ namespace SimpleRandAudio {
                             Console.WriteLine(e);
                         }
                         try {
-                            foreach (string dir in Directory.GetDirectories(path))
+                            foreach (var dir in Directory.GetDirectories(path))
                                 f(dir);
                         } catch (Exception e) {
                             Console.WriteLine(e);
@@ -118,7 +124,7 @@ namespace SimpleRandAudio {
                 files = new List<string>(datas);
                 break;
             }
-            int nfile = files.Count;
+            var nfile = files.Count;
             cmd = null;
             var ch = new Mutex();
             (new Thread(() => {
@@ -133,8 +139,8 @@ namespace SimpleRandAudio {
                     Thread.Sleep(666);
                 }
             })).Start();
-            bool started = false;
-            bool notquit = true;
+            var started = false;
+            var notquit = true;
             var re_vol = new Regex(@"^vol\s+(?<number>\d+)\s?$", RegexOptions.Compiled | RegexOptions.ExplicitCapture);
             void save() {
                 try {
@@ -234,7 +240,7 @@ namespace SimpleRandAudio {
                                 Console.WriteLine($"当前音量:{Bass.BASS_GetConfig(BASSConfig.BASS_CONFIG_GVOL_STREAM)}");
                             }
                         } else if (cmd.StartsWith("add")) {
-                            string path = GetFullPath(cmd.Substring(4).Replace("\"", string.Empty));
+                            var path = GetFullPath(cmd.Substring(4).Replace("\"", string.Empty));
                             if (File.Exists(path)) {
                                 if (Check(path))
                                     if (datas.Add(path)) {
@@ -255,13 +261,13 @@ namespace SimpleRandAudio {
                                         last_time = t;
                                         Console.Title = $"...{p}";
                                     }
-                                    foreach (string file in Directory.GetFiles(p))
+                                    foreach (var file in Directory.GetFiles(p))
                                         if (Check(file))
                                             if (datas.Add(file)) {
                                                 files.Add(file);
                                                 Console.WriteLine($"+{file}");
                                             }
-                                    foreach (string dir in Directory.GetDirectories(p))
+                                    foreach (var dir in Directory.GetDirectories(p))
                                         f(dir);
                                 }
                                 f(path);
@@ -272,13 +278,13 @@ namespace SimpleRandAudio {
                             } else
                                 Console.WriteLine("路径非法");
                         } else if (cmd.StartsWith("?")) {
-                            string pattern = cmd.Substring(1);
+                            var pattern = cmd.Substring(1);
                             try {
                                 var f = pattern.StartsWith("\\") ?
                                     (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
                                     (Func<string, bool>)(p => p.Contains(pattern));
-                                int n = 0;
-                                foreach (string file in files)
+                                var n = 0;
+                                foreach (var file in files)
                                     if (f(file)) {
                                         ++n;
                                         Console.WriteLine(file);
@@ -288,13 +294,13 @@ namespace SimpleRandAudio {
                                 Console.WriteLine(e);
                             }
                         } else if (cmd.StartsWith("-")) {
-                            string pattern = cmd.Substring(1);
+                            var pattern = cmd.Substring(1);
                             try {
                                 var f = pattern.StartsWith("\\") ?
                                     (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
                                     (Func<string, bool>)(p => p.Contains(pattern));
-                                int n = 0;
-                                foreach (string file in files)
+                                var n = 0;
+                                foreach (var file in files)
                                     if (f(file)) {
                                         ++n;
                                         Console.WriteLine($"-{file}");
@@ -310,7 +316,7 @@ namespace SimpleRandAudio {
                                 Console.WriteLine(e);
                             }
                         } else if (cmd.StartsWith("=")) {
-                            string pattern = cmd.Substring(1);
+                            var pattern = cmd.Substring(1);
                             try {
                                 toplay = pattern.StartsWith("\\") ?
                                     (new Regex(pattern.Substring(1), RegexOptions.Compiled | RegexOptions.ExplicitCapture).IsMatch) :
@@ -339,7 +345,7 @@ namespace SimpleRandAudio {
                     Thread.Sleep(320);
                     continue;
                 }
-                int index = toplay is null ? ((1 + rand.Next(nfile) + (new Random(Environment.TickCount).Next(nfile))) % nfile) : files.FindIndex(toplay);
+                var index = toplay is null ? ((1 + rand.Next(nfile) + RCutN(new Random(Environment.TickCount), (int)(DateTime.Now.Ticks % 257) + 2).Next(nfile)) % nfile) : files.FindIndex(toplay);
                 toplay = null;
                 if (index < 0) {
                     if (ch.WaitOne(1)) {
@@ -348,9 +354,9 @@ namespace SimpleRandAudio {
                     }
                     continue;
                 }
-                string file = files[index];
+                var file = files[index];
                 file = GetFullPath(file) ?? file;
-                int h = Bass.BASS_StreamCreateFile(file, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
+                var h = Bass.BASS_StreamCreateFile(file, 0, 0, BASSFlag.BASS_SAMPLE_FLOAT);
                 if (h is 0) {
                     if (ch.WaitOne(1)) {
                         Console.WriteLine($"读取文件失败:{Bass.BASS_ErrorGetCode()}|{file}");
@@ -360,17 +366,17 @@ namespace SimpleRandAudio {
                     continue;
                 }
                 playing = file;
-                double total_time = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h));
-                string str_total_time = sec2str(total_time);
-                double total_time2 = total_time * 0.95;
+                var total_time = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetLength(h));
+                var str_total_time = Sec2Str(total_time);
+                var total_time2 = total_time * 0.95;
                 total_time -= 0.125;
                 last_pos = -1;
                 Bass.BASS_ChannelPlay(h, true);
                 while (pcmd() && toplay is null) {
-                    double this_pos = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetPosition(h));
+                    var this_pos = Bass.BASS_ChannelBytes2Seconds(h, Bass.BASS_ChannelGetPosition(h));
                     if ((this_pos <= last_pos && this_pos > total_time2) || (this_pos >= total_time)) break;
                     last_pos = this_pos;
-                    Console.Title = $"{sec2str(this_pos)}/{str_total_time} | {file}";
+                    Console.Title = $"{Sec2Str(this_pos)}/{str_total_time} | {file}";
                     Thread.Sleep(320);
                 }
                 playing = null;
