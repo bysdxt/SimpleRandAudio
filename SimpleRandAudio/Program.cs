@@ -173,7 +173,7 @@ namespace SimpleRandAudio {
     start           开始播放列表
     stop            停止播放(不会记录播放位置)
     next            下一首
-    now/playing/`   输出当前正在播放的文件路径
+    now/playing/`/??输出当前正在播放的文件路径
     exit/quit       退出
     save <path>     保存当前播放列表到文件<path>，包括音量
     vol [<value>]   设置/显示当前音量，值范围 [0, 10000] 整数，如果已有列表文件(启动加载时输入的或者中途save命令保存的)，会同时保存到列表文件里
@@ -190,6 +190,7 @@ namespace SimpleRandAudio {
                         ch.ReleaseMutex();
                         return false;
                     }
+                    case "??":
                     case "now":
                     case "`":
                     case "playing":
