@@ -42,8 +42,8 @@ namespace SimpleRandAudio {
             return r;
         }
         private static void Main(string[] args) {
-            //Console.OutputEncoding = Encoding.UTF8;
-            //Console.InputEncoding = Encoding.UTF8;
+            Console.OutputEncoding = Encoding.Unicode;
+            Console.InputEncoding = Encoding.Unicode;
             Thread.Sleep(1);
             var rand = RCutN(new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF)), Environment.TickCount % 257);
             var mainmoddir = Path.GetDirectoryName(Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName));
