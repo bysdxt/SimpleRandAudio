@@ -45,7 +45,7 @@ namespace SimpleRandAudio {
             Console.OutputEncoding = Encoding.Unicode;
             Console.InputEncoding = Encoding.Unicode;
             Thread.Sleep(1);
-            var rand = RCutN(new Random((int)(DateTime.UtcNow.Ticks % 0x7FFFFFFF)), Environment.TickCount % 257);
+            var rand = RCutN(new Random((int)((Stopwatch.GetTimestamp() + DateTime.Now.Ticks) % int.MaxValue)), Environment.TickCount % 257);
             var mainmoddir = Path.GetDirectoryName(Path.GetFullPath(Process.GetCurrentProcess().MainModule.FileName));
             if (Directory.Exists(mainmoddir))
                 Bass.BASS_PluginLoadDirectory(mainmoddir);
@@ -346,7 +346,7 @@ namespace SimpleRandAudio {
                     Thread.Sleep(320);
                     continue;
                 }
-                var index = toplay is null ? ((1 + rand.Next(nfile) + RCutN(new Random(Environment.TickCount), (int)(DateTime.Now.Ticks % 257) + 2).Next(nfile)) % nfile) : files.FindIndex(toplay);
+                var index = toplay is null ? ((1 + rand.Next(nfile) + RCutN(new Random((int)((Stopwatch.GetTimestamp() + DateTime.Now.Ticks) % int.MaxValue)), Environment.TickCount % 257 + 2).Next(nfile)) % nfile) : files.FindIndex(toplay);
                 toplay = null;
                 if (index < 0) {
                     if (ch.WaitOne(1)) {
